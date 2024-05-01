@@ -1,0 +1,456 @@
+import csv
+import tkinter.ttk
+from tkinter import scrolledtext
+from tkinter import messagebox
+import mysql.connector
+from tkinter import *
+import sys
+
+# Connector to MySQL database. This application is designed to connect to the inventory database but has been modified
+# to operate using inventory data from a .csv file for evaluation purposes.
+# cnx = mysql.connector.connect(user='sqlUser',
+                              # password='Passw0rd!',
+                              # host='127.0.0.1',
+                              # database="windell'sinventory")
+
+# Gets inventory data from database
+# myCursor = cnx.cursor()
+# myCursor.execute("SELECT * FROM inventory")
+# invAtts = myCursor.fetchall()
+
+
+# Hash table class
+# Source: Dr. Cemal Tepe, MBA. "C950 - Webinar-1 - Let's Go Hashing - Complete Python Code".
+# https://srm--c.na127.visual.force.com/apex/coursearticle?Id=kA03x000000e1fuCAA
+# Modified to use lists as the underlying data structure
+class HashTable:
+    def __init__(self, initial_size=21):
+        self.list = []
+        for i in range(initial_size):
+            self.list.append([])
+
+    def insert(self, key, item):
+        bucket = hash(key) % len(self.list)
+        bucket_list = self.list[bucket]
+
+        for keyval in bucket_list:
+            if keyval[0] == key:
+                keyval[1] = item
+                return True
+
+        key_value = [key, item]
+        bucket_list.append(key_value)
+        return True
+
+    def remove(self, key):
+        slot = hash(key) % len(self.list)
+        dest = self.list[slot]
+
+        for keyValue in dest:
+            if keyValue[0] == key:
+                dest.remove([keyValue[0], keyValue[1]])
+
+        if key in dest:
+            dest.remove(key)
+
+    def search(self, key):
+        bucket = hash(key) % len(self.list)
+        bucket_list = self.list[bucket]
+
+        for pair in bucket_list:
+            if key == pair[0]:
+                return pair[1]
+        return None
+
+
+# Constructor for Inventory bin objects
+class InventoryAttributes:
+    def __init__(self, bin, productnum, productname, quantity, mandate, status, capacity, percentfull):
+        self.bin = bin
+        self.productnum = productnum
+        self.productname = productname
+        self.quantity = quantity
+        self.mandate = mandate
+        self.status = status
+        self.capacity = capacity
+        self.percentfull = percentfull
+
+    def __str__(self):
+        return "%s, %s, %s, %s, %s, %s, %s, %s" % (self.bin,
+                                                self.productnum,
+                                                self.productname,
+                                                self.quantity,
+                                                self.mandate,
+                                                self.status,
+                                                self.capacity,
+                                               self.percentfull)
+
+
+# Inserts bin objects into the hash table if connected to a database
+def load_inventory_data(listname):
+    for d in listname:
+        ibin = int(d[0])
+        iproductnum = int(d[1])
+        iproductname = d[2]
+        iquantity = int(d[3])
+        imandate = d[4]
+        istatus = d[5]
+        icapacity = int(d[6])
+        ipercentfull = 0
+
+        d = InventoryAttributes(ibin, iproductnum, iproductname, iquantity, imandate, istatus, icapacity, ipercentfull)
+
+        inventoryHash.insert(ibin, d)
+
+
+# Loads bin objects into the hash table using a .csv file
+def use_csv_file(inventory_data, bins):
+    with open(inventory_data) as items:
+        inventory_info = csv.reader(items)
+        for d in inventory_info:
+            ibin = int(d[0])
+            iproductnum = int(d[1])
+            iproductname = d[2]
+            iquantity = int(d[3])
+            imandate = d[4]
+            istatus = d[5]
+            icapacity = int(d[6])
+            ipercentfull = 0
+
+            d = InventoryAttributes(ibin, iproductnum, iproductname, iquantity, imandate, istatus, icapacity,
+                                    ipercentfull)
+
+            bins.insert(ibin, d)
+
+
+# Creates a hash table named inventoryHash
+inventoryHash = HashTable()
+
+# Calls function to load hash table from .csv file
+use_csv_file('inventory.csv', inventoryHash)
+
+# Calls function to load hash table when database connection is used
+# load_inventory_data(invAtts)
+
+# Creates main window for application
+window = Tk()
+window.title('Rewarehouse Wizard')
+window.geometry("760x885")
+
+# Creates log in window
+logInScreen = Toplevel()
+logInScreen.title('Log In')
+logInScreen.geometry('300x125')
+
+
+# Function to exit the application if log in screen window is closed
+def close_window():
+    exit()
+
+
+# Calls close_window function when log in window is closed
+logInScreen.protocol("WM_DELETE_WINDOW", close_window)
+
+# User name field and label
+username = Entry(logInScreen, width=30)
+username.place(x=90, y=18)
+usernameLabel = Label(logInScreen, text='User Name:')
+usernameLabel.place(x=20, y=18)
+
+# Password field and label
+password = Entry(logInScreen, width=30)
+password.place(x=90, y=47)
+passwordLabel = Label(logInScreen, text='Password:')
+passwordLabel.place(x=20, y=47)
+
+# Log in button
+logInEnter = Button(logInScreen, text="Login", command=lambda: log_in(), width=15)
+logInEnter.place(x=25, y=85)
+
+# Cancel log in button
+cancelLogIn = Button(logInScreen, text="Cancel", command=lambda: cancel_log_in(), width=15)
+cancelLogIn.place(x=150, y=85)
+
+
+# Checks for correct log in credentials
+def log_in():
+    if username.get() == "associate" and password.get() == "ww123":
+        # Un-hides the main window
+        window.deiconify()
+        # Removes the log in window
+        logInScreen.destroy()
+    else:
+        messagebox.showinfo('Log In Error', 'Could not log in.\nPlease double check that username\n'
+                                            'and password are entered correctly')
+
+
+# Cancels log in and ends application
+def cancel_log_in():
+    # Closes the log in window
+    logInScreen.destroy()
+    # Closes the main window
+    window.destroy()
+    # Ends the application
+    sys.exit()
+
+
+# Hides the main window until log in is successful
+window.withdraw()
+
+# Title label
+title = Label(window, text='Finished Goods Storage Optimizer')
+title.place(x=255, y=10)
+title.config(font=80)
+
+# Current inventory table label
+currinv = Label(window, text='Current Inventory:')
+currinv.place(x=65, y=30)
+
+
+# Creates table to display current inventory data
+class PrintInventoryData:
+    invTable = tkinter.ttk.Treeview(window, columns=('Bin', 'Product', 'Description', 'Status', 'Qty', 'Capacity'), show='headings', height=21)
+    invTable.column("Bin", anchor=CENTER, width=70)
+    invTable.heading("Bin", text='Bin No.', anchor=CENTER)
+    invTable.column("Product", anchor=CENTER, width=70)
+    invTable.heading("Product", text='Product No.', anchor=CENTER)
+    invTable.column("Description", anchor=CENTER, width=180)
+    invTable.heading("Description", text='Description', anchor=CENTER)
+    invTable.column("Status", anchor=CENTER, width=150)
+    invTable.heading("Status", text='Status', anchor=CENTER)
+    invTable.column("Qty", anchor=CENTER, width=75)
+    invTable.heading("Qty", text='Quantity', anchor=CENTER)
+    invTable.column("Capacity", anchor=CENTER, width=75)
+    invTable.heading("Capacity", text='Capacity', anchor=CENTER)
+
+    for i in range(len(inventoryHash.list)):
+        binList = (inventoryHash.search(i))
+        binId = getattr(binList, 'bin')
+        pNumId = getattr(binList, 'productnum')
+        pName = getattr(binList, 'productname')
+        pStatus = getattr(binList, 'status')
+        pQuant = getattr(binList, 'quantity')
+        bCap = getattr(binList, 'capacity')
+        iidnum = 0
+
+        invTable.insert(parent='', index='end', text='', values=[binId, pNumId, pName, pStatus, pQuant, bCap])
+        iidnum += 1
+
+    invTable.place(x=65, y=50)
+
+
+# Calculates and adds bin fullness percentage to hash table
+class CalculatePercentFull:
+    for i in range(len(inventoryHash.list)):
+        status_search = inventoryHash.search(i)
+        curquan = status_search.quantity
+        cap = status_search.capacity
+        percent = (curquan / cap)
+        setattr(inventoryHash.search(i), 'percentfull', percent)
+
+
+# Radio buttons and labels utilization factor setting
+utFactorLabel = Label(window, text="Set percentage for utilization factor:")
+utFactorLabel.place(x=70, y=500)
+utilizationFactor = StringVar()
+utRadio50 = Radiobutton(window, text='50%', variable=utilizationFactor, value='50')
+utRadio50.place(x=75, y=520)
+utRadio75 = Radiobutton(window, text='75%', variable=utilizationFactor, value='75')
+utRadio75.place(x=125, y=520)
+utRadio100 = Radiobutton(window, text='100%', variable=utilizationFactor, value='100')
+utRadio100.place(x=175, y=520)
+utilizationFactor.set('100')
+
+# Radio buttons and labels optimization factor setting
+rewarehouseFactorLabel = Label(window, text="Set optimization factor:")
+rewarehouseFactorLabel.place(x=400, y=500)
+rewarehouseFactor = StringVar()
+reware75 = Radiobutton(window, text='75%', variable=rewarehouseFactor, value='75')
+reware75.place(x=405, y=520)
+reware85 = Radiobutton(window, text='85%', variable=rewarehouseFactor, value='85')
+reware85.place(x=455, y=520)
+reware95 = Radiobutton(window, text='95%', variable=rewarehouseFactor, value='95')
+reware95.place(x=505, y=520)
+reware100 = Radiobutton(window, text='100%', variable=rewarehouseFactor, value='100')
+reware100.place(x=555, y=520)
+rewarehouseFactor.set('100')
+
+# Creates text field to display optimization information
+Rew = scrolledtext.ScrolledText(window, height=15, width=34, bg='light gray', font=12)
+Rew.place(x=380, y=576)
+
+# Creates text field to display current utilization information
+Rep = scrolledtext.ScrolledText(window, height=15, width=34, bg='light gray', font=12)
+Rep.place(x=40, y=576)
+
+
+# Function that calculates and populates current utilization report
+def runspacereport(self):
+    # gets user preference for utilization factor
+    if utilizationFactor.get() == '50':
+        setUtFactor = 0.50
+    if utilizationFactor.get() == '75':
+        setUtFactor = .75
+    if utilizationFactor.get() == '100':
+        setUtFactor = 1.0
+    # deletes any text currently in utilization report text field
+    Rep.delete(1.0, END)
+    utilizedBins = 0
+    textLine = 2.0
+    Rep.insert(1.0, "Bin | Qty | Cap | %Full \n")
+    # gets bin quantity and capacity information from hash table
+    for i in range(len(inventoryHash.list)):
+        quantity = getattr((inventoryHash.search(i)), 'quantity')
+        capacity = getattr((inventoryHash.search(i)), 'capacity')
+        # determines if bins are utilized according to user preferred utilization factor
+        binUtilization = quantity / capacity
+        if binUtilization >= setUtFactor:
+            utilizedBins += 1
+        # empty bins are considered utilized
+        if binUtilization == 0:
+            utilizedBins += 1
+        # retrieves additional information from hash table
+        lisst = inventoryHash.search(i)
+        binnum = getattr(lisst, 'bin')
+        currquan = getattr(lisst, 'quantity')
+        totcap = getattr(lisst, 'capacity')
+        binpercent = getattr(lisst, 'percentfull')
+        textLine += 1
+        # inserts utilized bin information into utilization report text field
+        Rep.insert(textLine, "%s, %s, %s, %s \n" % (binnum, currquan, totcap, binpercent))
+    # reports total number of utilized bins in utilization report text field
+    Rep.insert(textLine, "Total utilized bins: %s \n ***End Report***" % (utilizedBins))
+
+
+# Direct Optimization Algorithm
+def rewarehouse(self):
+    # user setting that sets the algorithm's upper limit. The algorithm will not recommend moving inventory to a bin
+    # with a fullness percentage above this limit.
+    if rewarehouseFactor.get() == '75':
+        setRwFactor = 0.75
+    if rewarehouseFactor.get() == '85':
+        setRwFactor = 0.85
+    if rewarehouseFactor.get() == '95':
+        setRwFactor = 0.95
+    if rewarehouseFactor.get() == '100':
+        setRwFactor = 1.0
+
+    # gets user's selection utilization factor to help determine overall potential utilized bins
+    if utilizationFactor.get() == '50':
+        setUtFactor = 0.50
+    if utilizationFactor.get() == '75':
+        setUtFactor = .75
+    if utilizationFactor.get() == '100':
+        setUtFactor = 1.0
+    # reletes information currently printed in optimization text field
+    Rew.delete(1.0, END)
+    # sets values of variables to 0
+    totalBins = 0
+    totalUtilization = 0
+    newUtilization = 0
+    suggestedQuantity = 0
+    utilizedBins = 0
+    suggestedUtilizedBins = 0
+    potentialEmptyBin = 0
+    moves = 0
+    textLine = 3.0
+    # prints preliminary information to text field
+    Rew.insert(1.0, "Suggested moves: \n")
+
+    # gathers information from hash table
+    for i in range(len(inventoryHash.list)):
+        prodNum = getattr((inventoryHash.search(i)), 'productnum')
+        binNum = getattr((inventoryHash.search(i)), 'bin')
+        quantity = getattr((inventoryHash.search(i)), 'quantity')
+        capacity = getattr((inventoryHash.search(i)), 'capacity')
+        status = getattr((inventoryHash.search(i)), 'status')
+        binUtilization = quantity / capacity
+
+        # keeps count of utlized bins
+        if binUtilization >= setUtFactor:
+            utilizedBins += 1
+        if binUtilization == 0:
+            utilizedBins += 1
+        totalBins += 1
+        totalUtilization += binUtilization
+
+        # checks for and suggests removal of expired inventory, ups move count, ups empty bin count
+        if status == 'Expired':
+            suggestedQuantity -= quantity
+            Rew.insert(textLine, 'Scrap expired inventory from bin %s \n' % binNum)
+            potentialEmptyBin +=1
+            moves += 1
+            textLine += 1
+
+        # gathers information regarding potential bins
+        for j in range(len(inventoryHash.list)):
+            nextProdNum = getattr((inventoryHash.search(j)), 'productnum')
+            nextBinNum = getattr((inventoryHash.search(j)), 'bin')
+            nextQuantity = getattr((inventoryHash.search(j)), 'quantity')
+            nextCapacity = getattr((inventoryHash.search(j)), 'capacity')
+            nextStatus = getattr((inventoryHash.search(j)), 'status')
+            nextUtilization = getattr((inventoryHash.search(j)), 'percentfull')
+            potential_quantity = quantity + nextQuantity
+
+            # conditions required for the algorithm to suggest an inventory move
+            if nextUtilization < setRwFactor and prodNum == nextProdNum and binNum != nextBinNum and \
+                    (potential_quantity < nextCapacity) and status == 'Approved' and nextStatus == 'Approved':
+                if quantity < nextQuantity:
+                    Rew.insert(textLine, 'move %s units from bin %s to bin %s \n' % (quantity, binNum, nextBinNum))
+                    newUtilization = potential_quantity / nextCapacity
+                    potentialEmptyBin += 1
+                    textLine += 1
+                    moves += 1
+                    if newUtilization > setUtFactor:
+                        suggestedUtilizedBins += 1
+
+                if nextQuantity > quantity:
+                    Rew.insert(textLine, 'move %s units from bin %s to bin %s \n' % (quantity, nextBinNum, binNum))
+                    newUtilization = potential_quantity / nextCapacity
+                    potentialEmptyBin += 1
+                    textLine +=1
+                    moves += 1
+                    if newUtilization > setUtFactor:
+                        suggestedUtilizedBins += 1
+
+    # calculations for potential improvement
+    totalPercentUtilization = utilizedBins / totalBins
+    totalNewUtilization = newUtilization / totalBins
+    potentialUtilizedBins = potentialEmptyBin + suggestedUtilizedBins + utilizedBins
+    potentialUtilization = potentialUtilizedBins / totalBins
+    improvementFactor = potentialUtilization - totalPercentUtilization
+
+    # inserts suggested moves into text field
+    if moves == 0:
+        Rew.insert(1.0, 'Sorry, no improvements can be recommended \n')
+        Rew.insert(textLine, "Current Utilization: %s" % round(totalPercentUtilization, 2))
+    else:
+        Rew.insert(1.0, 'Number of suggested moves: %s \n' % moves)
+        # inserts current utilization, potential utilization, and potential improvement statistics into text field
+        Rew.insert(textLine, "Current Utilization: %s \nPotential Utilization: %s \nPotential Utilization Improvement: "
+                             "%s \nCurrent Utilized Bins: %s \nPotential Utilized Bins %s \n***End Report***" %
+                   (round(totalPercentUtilization, 2), round(potentialUtilization, 2), round(improvementFactor, 2),
+                    utilizedBins, potentialUtilizedBins))
+
+
+# Closes the application when 'exit' button released
+def exitapp(self):
+    exit()
+
+
+reWhseBtn = Button(window, width=43, bg='light green', text='Generate Optimization Report')
+reWhseBtn.place(x=380, y=550)
+
+
+spaceReportBtn = Button(window, width=43, bg='light green', text='Current Conditions Report')
+spaceReportBtn.place(x=40, y=550)
+
+closeBtn = Button(window, width=15, bg='pink', text='Exit')
+closeBtn.place(x=575, y=855)
+
+spaceReportBtn.bind('<Button-1>', runspacereport)
+reWhseBtn.bind('<Button-1>', rewarehouse)
+closeBtn.bind('<ButtonRelease>', exitapp)
+
+
+window.mainloop()
